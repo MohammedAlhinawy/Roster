@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DutyRoster</title>
+<meta name="description" content="Know when you work, know when you're off, and never miss a duty.">
+<meta name="theme-color" content="#14161C">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="onboard-modal" class="modal hidden">
+  <div class="modal-card">
+    <p class="eyebrow-plain">Welcome to</p>
+    <h2>DutyRoster</h2>
+    <p class="modal-hint">Know when you work, know when you're off, and never miss a duty because you forgot your roster.</p>
+    <label>Your name <input id="ob-name" placeholder="Optional"></label>
+    <div class="modal-actions">
+      <button class="btn" id="ob-skip">Skip</button>
+      <button class="btn btn-primary" id="ob-start">Get started</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal hidden" id="entry-modal">
+  <div class="modal-card">
+    <h2 id="entry-modal-title">Add roster entry</h2>
+    <label>Date <input type="date" id="em-date"></label>
+    <label>Status <select id="em-code"></select></label>
+    <div id="em-time-fields" class="row-fields">
+      <label>Start <input type="time" id="em-start"></label>
+      <label>End <input type="time" id="em-end"></label>
+    </div>
+    <label>Location <input type="text" id="em-location" placeholder="e.g. TRA HQ"></label>
+    <label>Notes <input type="text" id="em-notes"></label>
+    <label id="em-leave-end-wrap" class="hidden">Leave ends <input type="date" id="em-leave-end"></label>
+    <div class="modal-actions">
+      <button class="btn" id="em-cancel">Cancel</button>
+      <button class="btn btn-primary" id="em-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal hidden" id="bulk-modal">
+  <div class="modal-card">
+    <h2>Bulk month entry</h2>
+    <p class="modal-hint">Enter one shift code per day for the month, in order (spaces, commas or new lines all work). Example: <code>M M O N N O M M O N N O</code></p>
+    <label>Month <input type="month" id="bulk-month"></label>
+    <label>Codes <textarea id="bulk-codes" rows="6" placeholder="M M O N N O M M O N N O ..."></textarea></label>
+    <div class="modal-actions">
+      <button class="btn" id="bulk-cancel">Cancel</button>
+      <button class="btn btn-primary" id="bulk-save">Save month</button>
+    </div>
+  </div>
+</div>
+
+<div id="alarm-modal" class="modal hidden alarm-modal">
+  <div class="modal-card alarm-card">
+    <p class="alarm-title">⏰ Wake up</p>
+    <p class="alarm-body"></p>
+    <div class="modal-actions">
+      <button class="btn snooze-btn">Snooze</button>
+      <button class="btn btn-primary dismiss-btn">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-shell">
+  <nav class="side-nav">
+    <div class="brand">
+      <span class="brand-mark">◒</span>
+      <span class="brand-name">DutyRoster</span>
+    </div>
+    <a class="nav-link" href="#/"><span>🏠</span>Home</a>
+    <a class="nav-link" href="#/calendar"><span>📅</span>Calendar</a>
+    <a class="nav-link" href="#/roster"><span>📋</span>Roster</a>
+    <a class="nav-link" href="#/alarms"><span>⏰</span>Alarms</a>
+    <a class="nav-link" href="#/import"><span>📥</span>Import</a>
+    <a class="nav-link" href="#/settings"><span>⚙️</span>Settings</a>
+  </nav>
+
+  <main id="view" class="view"></main>
+
+  <nav class="bottom-nav">
+    <a class="nav-link" href="#/"><span>🏠</span>Home</a>
+    <a class="nav-link" href="#/calendar"><span>📅</span>Calendar</a>
+    <a class="nav-link" href="#/roster"><span>📋</span>Roster</a>
+    <a class="nav-link" href="#/alarms"><span>⏰</span>Alarms</a>
+    <a class="nav-link" href="#/import"><span>📥</span>Import</a>
+    <a class="nav-link" href="#/settings"><span>⚙️</span>More</a>
+  </nav>
+</div>
+
+<script src="vendor/dexie.min.js"></script>
+<script src="vendor/papaparse.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/tesseract.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
