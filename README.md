@@ -1,87 +1,117 @@
-# DutyRoster
+# DutyRoster (Next.js)
 
-A personal shift-roster app: enter or import your roster (M/N/O/L/S), see
-today's duty and what's next, and get reminders/alarms before each shift.
-Runs entirely in your browser — there is no server and no account. All data
-is stored on-device in IndexedDB.
+A personal shift-roster app — Next.js 14 (App Router), vanilla CSS, IndexedDB
+via Dexie for local-only storage. No backend, no account.
 
-## Deploying to Netlify
+## Running it in VS Code
 
-This is a static site — no build step.
+```bash
+npm install
+npm run dev
+```
 
-1. Drag the whole `dutyroster` folder onto [app.netlify.com/drop](https://app.netlify.com/drop), **or**
-2. Push this folder to a GitHub repo and connect it in Netlify with:
-   - Build command: *(leave blank)*
-   - Publish directory: `.`
+Open http://localhost:3000. Resize the browser to a phone width (or open
+DevTools device toolbar) to see it as intended — it's built app-shaped, not
+as a responsive website.
 
-That's it — `netlify.toml` is already set up.
+`npm run build && npm run start` builds and serves the production build.
 
-## Using it as an "app"
+## The app-shell layout
 
-- **Android / desktop Chrome/Edge:** open the site, go to **Settings → Install
-  app**, or use the browser's own "Install app" menu option. It opens
-  full-screen, gets its own icon, and works offline.
-- **iPhone (Safari):** open the site in Safari → Share button → **Add to Home
-  Screen**. iOS doesn't show a JavaScript install prompt, so this is the only
-  path there.
+Every screen shares one fixed-height frame:
 
-## What's included
+- **App bar** — `15dvh`. Shows the date/greeting on Home, the page title
+  elsewhere, plus an avatar with your initials.
+- **Body** — `67dvh`, scrollable. This is the only part that changes between
+  pages, with a page-enter animation on every navigation.
+- **Bottom nav** — `18dvh`, exactly 5 tabs (Home, Calendar, Roster, Alarms,
+  Settings) with a sliding active-tab indicator. Import lives under Roster →
+  Import rather than taking a 6th tab.
 
-- **Dashboard** — today's status (handles night shifts crossing midnight
-  correctly), next duty, next off day, next 7 days.
-- **Calendar** — month view, tap a day to add/edit.
-- **Roster** — list view, single-entry form, and bulk month entry (paste a
-  row of codes like `M M O N N O ...`).
-- **Import** — Excel/CSV upload (`Date`, `Code` columns) and photo/screenshot
-  OCR (reads day-number + code pairs from an image using Tesseract.js,
-  entirely on-device). Both show a **review screen** before anything is
-  saved, so bad reads never silently corrupt your roster.
-- **Alarms & notifications** — per-shift-type reminder rules (e.g. wake-up
-  90 minutes before a Morning shift, leave-home reminder, shift-start
-  notice), a repeating "backup alarm" option, and a notification history.
-- **Settings** — editable shift types/colours/times, custom shift codes,
-  timezone, JSON backup export/import, and full data wipe.
+These proportions are CSS custom properties (`--appbar-h`, `--body-h`,
+`--bottomnav-h`) at the top of `app/globals.css` if you want to tune them.
 
-## Honest limits of browser-based alarms
+## Animations (all vanilla CSS, no animation library)
 
-This app is built to be as reliable as a website can be, but it is **not**
-the same as a native phone alarm, and you should know the difference:
+- Route changes fade/slide the body content in (`@keyframes pageEnter`), and
+  use the native View Transitions API when the browser supports it (Chrome/
+  Edge) for a cross-fade between screens — feature-detected, no-op elsewhere.
+- The bottom-nav active tab is a sliding pill (`transform: translateX`).
+- Modals slide up from the bottom with an opacity/transform transition.
+- The dashboard "on duty" card has a slow pulsing glow; the alarm modal has a
+  pulsing ring.
+- List rows stagger in on the dashboard's 7-day view.
 
-- Alarms are scheduled by the page itself (`setTimeout`), rechecked every
-  time the app regains focus, and re-synced every 30 minutes while open.
-  If the browser/OS fully kills the tab or the installed PWA in the
-  background (common on iOS, and on some Android battery-saver modes),
-  a scheduled alarm **will not fire** until you reopen the app.
-- There is no push server behind this app, so there's no way to wake the
-  device from a fully closed state the way a native alarm clock can.
-- For best reliability: install it to your home screen, leave notification
-  permission granted, and keep the app in your recent-apps list rather than
-  force-closing it. On Android this is generally reliable; on iOS, Safari's
-  background limits mean you should treat DutyRoster as a strong reminder
-  system, not a substitute for your phone's built-in alarm for anything
-  safety-critical.
-- If you outgrow this later, the architecture is intentionally simple to
-  hand off to a native shell (e.g. Capacitor/React Native) for guaranteed
-  background alarms — the roster/alarm-rule data model here would carry
-  over directly.
+## The "which one is you?" roster picker
 
-## Data & backups
+This is the main new feature. When you import a roster (Excel/CSV or a
+photo/screenshot via OCR) that lists **many people** — one row per person,
+one column per day — DutyRoster:
 
-Everything lives in this browser's IndexedDB. Clearing site data/browser
-data deletes it. Use **Settings → Export backup** regularly (it's a small
-JSON file) and **Import backup** to restore or move to a new device/browser.
+1. Detects the shape automatically (`lib/matrixParse.js`): a first column of
+   names plus day-number or date columns.
+2. Shows a picker of every name it found (or a "type your name" fallback if
+   OCR misread it).
+3. Pulls out only that person's row, asks which month it covers if the
+   sheet only has day numbers, and hands it to the same review screen as any
+   other import — nothing saves until you confirm.
+4. Remembers your name in **Settings → Identity**, so the app bar shows your
+   initials and the next multi-person import can offer the same name again.
 
-## Project structure
+A single-person export (`Date`, `Code` columns) skips the picker entirely.
+
+## Where things live
 
 ```
-index.html         App shell, nav, modals
-css/style.css       Styling
-js/db.js            IndexedDB schema + shift/date logic (night-shift-safe)
-js/notify.js        Alarm/notification scheduling engine
-js/app.js           Router + bootstrap
-js/render/*.js       One file per screen
-vendor/*.js          Dexie, PapaParse, SheetJS, Tesseract.js (bundled, no CDN dependency for the core app)
-sw.js               Service worker (offline app-shell caching)
-manifest.json       PWA manifest
-netlify.toml        Netlify config
+app/
+  layout.js          Root layout (fonts, metadata, wraps AppShell)
+  globals.css         All styling — theme tokens, layout, animations
+  page.js              Dashboard
+  calendar/page.js
+  roster/page.js
+  roster/import/page.js   CSV/Excel + OCR import, multi-person handling
+  alarms/page.js
+  settings/page.js
+components/
+  AppShell.js          App bar + animated body + bottom nav, boot sequence
+  AppBar.js / BottomNav.js
+  Modal.js             Generic animated modal wrapper
+  ModalHost.js          Mounts every modal once
+  modals/*.js           Entry, bulk entry, person picker, alarm alert, onboarding
+context/ModalContext.js  Open/close state for all modals
+lib/
+  db.js                Dexie schema + shift/date logic (night-shift-safe)
+  notify.js             setTimeout-based alarm/notification engine
+  matrixParse.js         CSV/Excel/OCR parsing incl. multi-person detection
 ```
+
+## Data model notes
+
+- `db.roster` — one row per date (`YYYY-MM-DD`), with a shift `code`.
+- `db.shiftTypes` — M/N/O/L/S plus any custom codes you add in Settings.
+- `db.alarmRules` — per-shift-type reminder rules (minutes-before + type).
+- `db.settings` — key/value, includes `activePersonName` (who you are on a
+  shared roster) and `lastImportPeople` (names seen in your last multi-person
+  import, used by "Change identity" in Settings).
+
+Everything is local to the browser's IndexedDB — there's no export/import
+of it to a file yet in this version (the earlier plain-HTML build had a JSON
+backup button in Settings; easy to port back in if you want it here too).
+
+## Honest limits of browser alarms
+
+Alarms are scheduled with `setTimeout` while the app is open, and
+re-synced on focus and every 30 minutes. If the OS fully suspends the tab in
+the background (common on iOS, and on some Android battery savers), a
+scheduled alarm won't fire until you reopen the app — there's no push server
+behind this. Treat it as a strong reminder layer, not a replacement for your
+phone's native alarm for anything safety-critical.
+
+## Extending
+
+- Want this deployed too (not just local dev)? It's a standard Next.js app —
+  Vercel works with zero config, or Netlify via the `@netlify/plugin-nextjs`
+  build plugin (the previous plain-HTML build in this project's history is
+  the simpler drag-and-drop-to-Netlify option if you don't need Next).
+- OCR (`tesseract.js`) and Excel parsing (`xlsx`) are dynamically imported
+  only when you use those features, so the main bundle stays small.
