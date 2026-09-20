@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getSetting, setSetting } from '../../lib/db';
 import { rescheduleAll, requestPermission, getRecentNotifications } from '../../lib/notify';
+import { removeAlarmRule } from '../../lib/sync';
 
 export default function AlarmsPage() {
   const [perm, setPerm] = useState('unsupported');
@@ -33,8 +34,8 @@ export default function AlarmsPage() {
     await db.alarmRules.update(id, patch);
     await rescheduleAll();
   }
-  async function deleteRule(id) {
-    await db.alarmRules.delete(id);
+  async function deleteRule(rule) {
+    await removeAlarmRule(rule);
   }
 
   return (
@@ -60,7 +61,7 @@ export default function AlarmsPage() {
                   <input type="checkbox" checked={r.enabled} onChange={(e) => updateRule(r.id, { enabled: e.target.checked })} />
                   <span />
                 </label>
-                <button className="rr-del" onClick={() => deleteRule(r.id)}>✕</button>
+                <button className="rr-del" onClick={() => deleteRule(r)}>✕</button>
               </div>
             ))}
           </div>

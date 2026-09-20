@@ -1,9 +1,11 @@
 # DutyRoster (Next.js)
 
-A personal shift-roster app — Next.js 14 (App Router), vanilla CSS, IndexedDB
-via Dexie for local-only storage. No backend, no account.
+A personal shift-roster app — Next.js (App Router), vanilla CSS, local-first
+sync. Dexie/IndexedDB is the source of truth the UI reads from; Supabase is
+the sync target so the same account works on the web app and the (separate)
+React Native app. Everything still works fully offline and without an account.
 
-## Running it in VS Code
+## Running it
 
 ```bash
 npm install
@@ -11,107 +13,106 @@ npm run dev
 ```
 
 Open http://localhost:3000. Resize the browser to a phone width (or open
-DevTools device toolbar) to see it as intended — it's built app-shaped, not
-as a responsive website.
+DevTools device toolbar) to see it as intended — it's built app-shaped.
 
-`npm run build && npm run start` builds and serves the production build.
+## Supabase setup
 
-## The app-shell layout
+1. Create a project at https://supabase.com.
+2. Open **SQL Editor**, paste `supabase/schema.sql`, run it. It creates
+   `profiles`, `shift_types`, `roster_entries`, `alarm_rules`,
+   `user_settings`, `devices` — all with owner-only RLS, `updated_at`
+   triggers, soft deletes (`deleted_at`), and a trigger that seeds default
+   shift types + alarm rules on signup.
+3. Copy `.env.local.example` to `.env.local` and fill in
+   `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (found in
+   Dashboard → Project Settings → API). **Never commit real keys; never put
+   the service-role key in the browser bundle.**
 
-Every screen shares one fixed-height frame:
+The app additionally runs **without** any of this in plain local-only mode.
 
-- **App bar** — `15dvh`. Shows the date/greeting on Home, the page title
-  elsewhere, plus an avatar with your initials.
-- **Body** — `67dvh`, scrollable. This is the only part that changes between
-  pages, with a page-enter animation on every navigation.
-- **Bottom nav** — `18dvh`, exactly 5 tabs (Home, Calendar, Roster, Alarms,
-  Settings) with a sliding active-tab indicator. Import lives under Roster →
-  Import rather than taking a 6th tab.
+## How sync works
 
-These proportions are CSS custom properties (`--appbar-h`, `--body-h`,
-`--bottomnav-h`) at the top of `app/globals.css` if you want to tune them.
+Local-first, last-write-wins on `updated_at`:
 
-## Animations (all vanilla CSS, no animation library)
+- **Dexie is the UI's source of truth.** Every write to a synced table
+  (`shiftTypes`, `roster`, `alarmRules`) is stamped `dirty` + `updatedAt` by
+  IndexedDB hooks (`lib/db.js`).
+- **Push**: `lib/sync.js` upserts dirty rows to Supabase and clears the flag.
+- **Pull**: rows changed since the stored `lastPulledAt` cursor are fetched;
+  newer rows overwrite local ones (LWW), cloud soft-deletes remove local ones.
+- **Deletes** become tombstones → the remote row gets `deleted_at`.
+- **Realtime**: Postgres changes on `roster_entries` + `alarm_rules` trigger a
+  pull, which calls `rescheduleAll()` — an alarm changed on your phone re-times
+  the web alarms.
+- Sync runs on sign-in, app focus, any data mutation, and a periodic timer.
+  Offline failures are queued and retried; sync never blocks the UI.
 
-- Route changes fade/slide the body content in (`@keyframes pageEnter`), and
-  use the native View Transitions API when the browser supports it (Chrome/
-  Edge) for a cross-fade between screens — feature-detected, no-op elsewhere.
-- The bottom-nav active tab is a sliding pill (`transform: translateX`).
-- Modals slide up from the bottom with an opacity/transform transition.
-- The dashboard "on duty" card has a slow pulsing glow; the alarm modal has a
-  pulsing ring.
-- List rows stagger in on the dashboard's 7-day view.
+## Accounts, local-only mode, and privacy
 
-## The "which one is you?" roster picker
+- Email + password sign-in/sign-up at `/login` and `/signup`. A signed-out
+  visitor can choose **"Use without an account"** and everything runs
+  locally-only; a small banner offers sign-in for sync.
+- `profiles.roster_name` is the synced version of Settings → Identity.
+  `lastImportPeople` stays device-local (it can contain colleagues' names).
 
-This is the main new feature. When you import a roster (Excel/CSV or a
-photo/screenshot via OCR) that lists **many people** — one row per person,
-one column per day — DutyRoster:
+### Files are never uploaded
 
-1. Detects the shape automatically (`lib/matrixParse.js`): a first column of
-   names plus day-number or date columns.
-2. Shows a picker of every name it found (or a "type your name" fallback if
-   OCR misread it).
-3. Pulls out only that person's row, asks which month it covers if the
-   sheet only has day numbers, and hands it to the same review screen as any
-   other import — nothing saves until you confirm.
-4. Remembers your name in **Settings → Identity**, so the app bar shows your
-   initials and the next multi-person import can offer the same name again.
+Roster photos, screenshots, PDFs, `.xlsx`, `.csv` — all of it stays **on the
+device**. OCR (`tesseract.js`), spreadsheet (`xlsx`) and CSV (`papaparse`)
+parsing happen client-side, and only the **parsed rows** (date + shift code)
+are ever written to your account. When you pick your name on a shared roster,
+everyone else's rows are discarded before anything is saved.
 
-A single-person export (`Date`, `Code` columns) skips the picker entirely.
+## The app shell & animations
+
+Read the original notes: a fixed 15/75/10 `dvh` frame (app bar / body / bottom
+nav), vanilla-CSS page-enter + View Transitions, sliding tab pill, pulsing
+hero/alarm card. — `app/globals.css` holds the `--appbar-h`/`--body-h`/
+`--bottomnav-h` tokens.
 
 ## Where things live
 
 ```
-app/
-  layout.js          Root layout (fonts, metadata, wraps AppShell)
-  globals.css         All styling — theme tokens, layout, animations
-  page.js              Dashboard
-  calendar/page.js
-  roster/page.js
-  roster/import/page.js   CSV/Excel + OCR import, multi-person handling
-  alarms/page.js
-  settings/page.js
-components/
-  AppShell.js          App bar + animated body + bottom nav, boot sequence
-  AppBar.js / BottomNav.js
-  Modal.js             Generic animated modal wrapper
-  ModalHost.js          Mounts every modal once
-  modals/*.js           Entry, bulk entry, person picker, alarm alert, onboarding
-context/ModalContext.js  Open/close state for all modals
+app/                  pages (dashboard, calendar, roster, import, alarms, settings, login, signup)
+components/           AppShell, AppBar, BottomNav, Modal*, modals/*, SyncEngine, AuthBanner
+context/              ModalContext, AuthContext
 lib/
-  db.js                Dexie schema + shift/date logic (night-shift-safe)
-  notify.js             setTimeout-based alarm/notification engine
-  matrixParse.js         CSV/Excel/OCR parsing incl. multi-person detection
+  db.js               Dexie schema (v2: dirty/updatedAt/tombstones), night-shift-safe date logic
+  sync.js             local-first sync engine + realtime + identity helpers
+  syncHooks.js        useSyncStatus() for the Settings panel
+  notify.js           setTimeout alarm/notification engine (kept — push is optional later)
+  matrixParse.js      CSV/Excel/OCR parsing incl. multi-person detection
+  supabase/client.js  browser Supabase client
+  supabase/server.js  SSR cookie client (@supabase/ssr)
+proxy.js            session refresh + signed-out redirect to /login (Next 16 proxy convention)
+supabase/schema.sql   shared schema, applied once via SQL Editor
 ```
 
 ## Data model notes
 
-- `db.roster` — one row per date (`YYYY-MM-DD`), with a shift `code`.
-- `db.shiftTypes` — M/N/O/L/S plus any custom codes you add in Settings.
-- `db.alarmRules` — per-shift-type reminder rules (minutes-before + type).
-- `db.settings` — key/value, includes `activePersonName` (who you are on a
-  shared roster) and `lastImportPeople` (names seen in your last multi-person
-  import, used by "Change identity" in Settings).
-
-Everything is local to the browser's IndexedDB — there's no export/import
-of it to a file yet in this version (the earlier plain-HTML build had a JSON
-backup button in Settings; easy to port back in if you want it here too).
+- `db.roster` — one row per date (`YYYY-MM-DD`) + shift `code`. Each row also
+  carries sync fields (`dirty`, `updatedAt`) stamped automatically.
+- `db.shiftTypes` — M/N/O/L/S + custom codes; `db.alarmRules` — per-shift
+  reminders; `db.settings` — key/value (synced user settings + device-local
+  keys like `lastImportPeople`); `db.notificationLog` — never synced (a fired
+  notification is a device-local event).
+- Add/update/delete any roster line and alarms reschedule automatically.
 
 ## Honest limits of browser alarms
 
-Alarms are scheduled with `setTimeout` while the app is open, and
-re-synced on focus and every 30 minutes. If the OS fully suspends the tab in
-the background (common on iOS, and on some Android battery savers), a
-scheduled alarm won't fire until you reopen the app — there's no push server
-behind this. Treat it as a strong reminder layer, not a replacement for your
-phone's native alarm for anything safety-critical.
+Alarms are scheduled with `setTimeout` while the app is open and re-synced on
+focus and every 30 minutes. If the OS fully suspends the tab, an alarm won't
+fire until the app reopens — no push server behind it yet. Treat it as a
+strong reminder layer, not a replacement for a native alarm for anything
+safety-critical. (Web push is a planned, optional addition via the `devices`
+table.)
 
-## Extending
+## Deploying
 
-- Want this deployed too (not just local dev)? It's a standard Next.js app —
-  Vercel works with zero config, or Netlify via the `@netlify/plugin-nextjs`
-  build plugin (the previous plain-HTML build in this project's history is
-  the simpler drag-and-drop-to-Netlify option if you don't need Next).
-- OCR (`tesseract.js`) and Excel parsing (`xlsx`) are dynamically imported
-  only when you use those features, so the main bundle stays small.
+This is a server-rendered Next.js app (auth middleware + cookies), **not** a
+static export site:
+
+- **Vercel** — zero config, works out of the box.
+- **Netlify** — the `netlify.toml` in the repo uses the official
+  `@netlify/plugin-nextjs`. Add the two `NEXT_PUBLIC_SUPABASE_*` env vars in
+  the dashboard.

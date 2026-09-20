@@ -1,13 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getSetting, setSetting } from '../../lib/db';
 import { rescheduleAll } from '../../lib/notify';
 import { useModal } from '../../context/ModalContext';
+import { useAuth } from '../../context/AuthContext';
+import { setIdentity, syncNow } from '../../lib/sync';
+import { useSyncStatus } from '../../lib/syncHooks';
 
 export default function SettingsPage() {
   const { openPersonPicker } = useModal();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+  const syncStatus = useSyncStatus();
   const shiftTypes = useLiveQuery(() => (db ? db.shiftTypes.toArray() : []), [], []);
 
   const [userName, setUserName] = useState('');
@@ -38,12 +46,18 @@ export default function SettingsPage() {
     if (lastImportPeople.length > 0) {
       openPersonPicker(lastImportPeople, async (name) => {
         setActivePersonName(name);
-        await setSetting('activePersonName', name);
+        await setIdentity(name);
       });
     } else {
       const name = prompt('Your name, as it should appear:', activePersonName);
-      if (name) { setActivePersonName(name); setSetting('activePersonName', name); }
+      if (name) { setActivePersonName(name); setIdentity(name); }
     }
+  }
+
+  async function signOutAndStayLocal() {
+    await signOut();
+    router.push('/');
+    router.refresh();
   }
 
   async function updateShiftType(code, patch) {
@@ -100,9 +114,50 @@ export default function SettingsPage() {
       <header className="page-head"><h1>Settings</h1></header>
 
       <div className="panel">
+        <h2>Account</h2>
+        {user ? (
+          <>
+            <p className="mini-main">Signed in as {user.email}</p>
+            <p className="muted-note">Your roster syncs across every device you sign in on.</p>
+            <button className="btn btn-danger" onClick={signOutAndStayLocal}>Sign out (keep local copy)</button>
+          </>
+        ) : (
+          <>
+            <p className="muted-note">Not signed in. Data lives only on this device.</p>
+            <Link href="/login" className="btn">Sign in to sync</Link>
+          </>
+        )}
+      </div>
+
+      <div className="panel">
+        <h2>Sync</h2>
+        <div className="sync-row">
+          <span>Last synced</span>
+          <strong>{syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleString() : 'never'}</strong>
+        </div>
+        <div className="sync-row">
+          <span>Pending changes</span>
+          <strong>{syncStatus.pending ?? 0}</strong>
+        </div>
+        <button
+          className="btn"
+          disabled={!syncStatus.signedIn || syncStatus.syncing}
+          onClick={() => syncNow()}
+        >
+          {syncStatus.syncing ? 'Syncing…' : 'Sync now'}
+        </button>
+        <p className="muted-note">
+          {syncStatus.signedIn
+            ? 'Changes here sync automatically when online.'
+            : 'Sign in to sync across devices. Imported files are never uploaded — only the shift rows you confirm.'}
+        </p>
+      </div>
+
+      <div className="panel">
         <h2>Identity</h2>
         <p className="muted-note">
           When a roster has many people on it, DutyRoster only imports the row that belongs to you.
+          {syncStatus.signedIn && ' Your identity also syncs with your account.'}
         </p>
         <p className="mini-main">{activePersonName || 'Not set yet'}</p>
         <button className="btn" onClick={changeIdentity}>Change identity</button>
@@ -168,7 +223,7 @@ export default function SettingsPage() {
         <button className="btn btn-danger" onClick={wipeAll}>Erase all data</button>
       </div>
 
-      <p className="version-note">DutyRoster · Next.js · runs entirely on this device · v1.0</p>
+      <p className="version-note">DutyRoster · Next.js · runs on this device + your account · v1.0</p>
     </section>
   );
 }

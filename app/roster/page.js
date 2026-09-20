@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, todayISO } from '../../lib/db';
-import { rescheduleAll } from '../../lib/notify';
+import { removeRoster } from '../../lib/sync';
 import { useModal } from '../../context/ModalContext';
 
 export default function RosterPage() {
@@ -18,8 +18,7 @@ export default function RosterPage() {
 
   async function del(date) {
     if (!confirm('Delete this roster entry and its alarms?')) return;
-    await db.roster.where('date').equals(date).delete();
-    await rescheduleAll();
+    await removeRoster(date);
   }
 
   return (

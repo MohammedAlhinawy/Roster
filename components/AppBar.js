@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { LuUser } from 'react-icons/lu';
 import { db, todayISO, weekday, dayLabel } from '../lib/db';
 
 const TITLES = {
@@ -12,11 +13,6 @@ const TITLES = {
   '/alarms': 'Alarms',
   '/settings': 'Settings',
 };
-
-function initials(name) {
-  if (!name) return '·';
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
-}
 
 export default function AppBar() {
   const pathname = usePathname();
@@ -50,7 +46,7 @@ export default function AppBar() {
         </div>
       </div>
       <div className="app-bar-avatar" title={activePerson || 'Set your identity in Settings'}>
-        {initials(activePerson)}
+        <LuUser />
       </div>
     </header>
   );

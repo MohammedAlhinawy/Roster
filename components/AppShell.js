@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { ModalProvider, useModal } from '../context/ModalContext';
+import { AuthProvider } from '../context/AuthContext';
 import AppBar from './AppBar';
 import BottomNav from './BottomNav';
 import ModalHost from './ModalHost';
+import SyncEngine from './SyncEngine';
 import { ensureSeeded, getSetting } from '../lib/db';
 import { rescheduleAll, setAlarmHandler } from '../lib/notify';
 
@@ -51,14 +53,17 @@ function AnimatedBody({ children }) {
 
 export default function AppShell({ children }) {
   return (
-    <ModalProvider>
-      <Boot />
-      <div className="app-frame">
-        <AppBar />
-        <AnimatedBody>{children}</AnimatedBody>
-        <BottomNav />
-      </div>
-      <ModalHost />
-    </ModalProvider>
+    <AuthProvider>
+      <ModalProvider>
+        <Boot />
+        <SyncEngine />
+        <div className="app-frame">
+          <AppBar />
+          <AnimatedBody>{children}</AnimatedBody>
+          <BottomNav />
+        </div>
+        <ModalHost />
+      </ModalProvider>
+    </AuthProvider>
   );
 }
