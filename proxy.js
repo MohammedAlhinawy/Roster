@@ -7,6 +7,12 @@ const LOCAL_MODE_COOKIE = 'dutyroster.local';
 export async function proxy(request) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // Deployment without the Supabase env vars: serve every page in local-only
+  // mode rather than crashing the proxy with "URL and Key are required".
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
