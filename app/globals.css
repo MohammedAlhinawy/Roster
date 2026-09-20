@@ -122,6 +122,7 @@ code { background: var(--surface-2); padding: .1rem .35rem; border-radius: 4px; 
   color: var(--text-muted);
   font-size: .68rem;
   border-radius: 14px;
+  height: 100%;
   transition: color .2s;
 }
 .bottom-nav-tab.is-active { color: var(--text); }
@@ -411,4 +412,9 @@ code { background: var(--surface-2); padding: .1rem .35rem; border-radius: 4px; 
 @media (min-width: 540px) {
   .modal-overlay { align-items: center; }
   .modal-card { border-radius: 18px; }
+}
+
+input[type=range],
+input[type=time], input[type=date], input:not([type]) {
+  width: calc(100% - 1.2rem);
 }

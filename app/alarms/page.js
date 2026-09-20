@@ -74,7 +74,7 @@ export default function AlarmsPage() {
           <input type="checkbox" checked={backupEnabled} onChange={async (e) => { setBackupEnabled(e.target.checked); await setSetting('backupAlarmEnabled', e.target.checked); }} />
           Repeat wake-up alarm if not dismissed
         </label>
-        <label>Repeat every <input type="number" min="1" style={{ width: '4rem', display: 'inline-block' }} value={backupMinutes} onChange={async (e) => { setBackupMinutes(Number(e.target.value)); await setSetting('backupAlarmMinutes', Number(e.target.value)); }} /> minutes</label>
+        <label>Repeat every <input type="number" min="1" style={{ width: '3.8rem', display: 'inline-block' }} value={backupMinutes} onChange={async (e) => { setBackupMinutes(Number(e.target.value)); await setSetting('backupAlarmMinutes', Number(e.target.value)); }} /> minutes</label>
       </div>
 
       <div className="panel">
